@@ -1,0 +1,187 @@
+SSH: Check and Restart kubelet
+
+root@controlplane:~$ kubectl get nodes
+NAME           STATUS   ROLES           AGE   VERSION
+controlplane   Ready    control-plane   31d   v1.37.1
+node01         Ready    <none>          31d   v1.37.1
+root@controlplane:~$ ssh node01
+Last login: Wed Jun 17 06:26:38 2026 from 10.244.0.152
+root@node01:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: enp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc fq_codel state UP group default qlen 1000
+    link/ether 7a:72:57:d6:ce:ad brd ff:ff:ff:ff:ff:ff
+    inet 172.30.2.2/24 brd 172.30.2.255 scope global dynamic noprefixroute enp1s0
+       valid_lft 86312552sec preferred_lft 75523352sec
+    inet6 fe80::52a0:2a13:5622:7c9f/64 scope link 
+       valid_lft forever preferred_lft forever
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1454 qdisc noqueue state DOWN group default 
+    link/ether 02:42:55:d6:d9:da brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+4: cilium_net@cilium_host: <BROADCAST,MULTICAST,NOARP,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default 
+    link/ether ba:2a:a3:54:dc:07 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::b82a:a3ff:fe54:dc07/64 scope link 
+       valid_lft forever preferred_lft forever
+5: cilium_host@cilium_net: <BROADCAST,MULTICAST,NOARP,UP,LOWER_UP> mtu 1400 qdisc noqueue state UP group default qlen 1000
+    link/ether 8a:a8:cb:4e:a0:e3 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.25/32 scope global cilium_host
+       valid_lft forever preferred_lft forever
+    inet6 fe80::88a8:cbff:fe4e:a0e3/64 scope link 
+       valid_lft forever preferred_lft forever
+6: cilium_vxlan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1400 qdisc noqueue state UNKNOWN group default 
+    link/ether c6:18:ff:c5:58:81 brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::c418:ffff:fec5:5881/64 scope link 
+       valid_lft forever preferred_lft forever
+root@node01:~$ exit
+logout
+Connection to node01 closed.
+root@controlplane:~$ dig node01
+
+; <<>> DiG 9.18.39-0ubuntu0.24.04.7-Ubuntu <<>> node01
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 35424
+;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 512
+;; QUESTION SECTION:
+;node01.                                IN      A
+
+;; AUTHORITY SECTION:
+.                       86395   IN      SOA     a.root-servers.net. nstld.verisign-grs.com. 2026110500 1800 900 604800 86400
+
+;; Query time: 2 msec
+;; SERVER: 8.8.8.8#53(8.8.8.8) (UDP)
+;; WHEN: Thu Nov 05 15:50:14 UTC 2026
+;; MSG SIZE  rcvd: 110
+
+root@controlplane:~$ nxlookup node01
+Command 'nxlookup' not found, did you mean:
+  command 'nslookup' from deb bind9-dnsutils (1:9.18.39-0ubuntu0.24.04.5)
+Try: apt install <deb name>
+root@controlplane:~$ nslookup node01
+Server:         8.8.8.8
+Address:        8.8.8.8#53
+
+** server can't find node01: NXDOMAIN
+
+root@controlplane:~$ ssh node01
+Last login: Thu Nov  5 15:49:54 2026 from 10.244.4.242
+root@node01:~$ systemctl status kubelet
+○ kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: inactive (dead) since Thu 2026-11-05 15:49:34 UTC; 1min 20s ago
+   Duration: 17min 10.060s
+       Docs: https://kubernetes.io/docs/
+    Process: 721 ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS (code=exited, status=0/SUCCESS)
+   Main PID: 721 (code=exited, status=0/SUCCESS)
+        CPU: 5.623s
+
+Nov 05 15:33:52 node01 kubelet[721]: I1105 15:33:52.565262     721 server.go:177] "Pod update broadcasted" podUID="af29f6a8-14e1-49ae-b815-c613fdc85727" type="MODIFIED"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717308     721 eviction_manager.go:224] "Eviction manager: monitoring loop exiting" err="context canceled"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717439     721 podcertificatemanager.go:351] "podcertificate.IssuingManager shut down"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717460     721 volume_manager.go:341] "Shutting down Kubelet Volume Manager"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717507     721 tlsconfig.go:258] "Shutting down DynamicServingCertificateController"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717519     721 server.go:302] "Shutting down pods API server"
+Nov 05 15:49:34 node01 systemd[1]: Stopping kubelet.service - kubelet: The Kubernetes Node Agent...
+Nov 05 15:49:34 node01 systemd[1]: kubelet.service: Deactivated successfully.
+Nov 05 15:49:34 node01 systemd[1]: Stopped kubelet.service - kubelet: The Kubernetes Node Agent.
+Nov 05 15:49:34 node01 systemd[1]: kubelet.service: Consumed 5.623s CPU time.
+root@node01:~$ systemctl status kubelet -n 20
+○ kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: inactive (dead) since Thu 2026-11-05 15:49:34 UTC; 1min 37s ago
+   Duration: 17min 10.060s
+       Docs: https://kubernetes.io/docs/
+    Process: 721 ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS (code=exited, status=0/SUCCESS)
+   Main PID: 721 (code=exited, status=0/SUCCESS)
+        CPU: 5.623s
+
+Nov 05 15:32:56 node01 kubelet[721]: I1105 15:32:56.674353     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:32:57 node01 kubelet[721]: I1105 15:32:57.573766     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:32:57 node01 kubelet[721]: I1105 15:32:57.573895     721 scope.go:118] "RemoveContainer" containerID="811ed61fa8af27e45bcf400ed256591b075ffa0b5d6202fd548872d630548db0"
+Nov 05 15:32:57 node01 kubelet[721]: I1105 15:32:57.575884     721 kubelet_resources.go:67] "Allocatable" allocatable={"cpu":"1","ephemeral-storage":"18698430040","hugepages-2Mi":"0","memory":"1846512Ki","pods":"110"}
+Nov 05 15:32:57 node01 kubelet[721]: I1105 15:32:57.697849     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:32:58 node01 kubelet[721]: I1105 15:32:58.575450     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:33:02 node01 kubelet[721]: I1105 15:33:02.555910     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:33:02 node01 kubelet[721]: I1105 15:33:02.801869     721 prober_manager.go:368] "Failed to trigger a manual run" probe="Readiness"
+Nov 05 15:33:02 node01 kubelet[721]: I1105 15:33:02.803703     721 server.go:177] "Pod update broadcasted" podUID="fc78b9fa-e21e-4acf-ac14-2e3817a66e64" type="MODIFIED"
+Nov 05 15:33:52 node01 kubelet[721]: I1105 15:33:52.563302     721 server.go:177] "Pod update broadcasted" podUID="af29f6a8-14e1-49ae-b815-c613fdc85727" type="MODIFIED"
+Nov 05 15:33:52 node01 kubelet[721]: I1105 15:33:52.565262     721 server.go:177] "Pod update broadcasted" podUID="af29f6a8-14e1-49ae-b815-c613fdc85727" type="MODIFIED"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717308     721 eviction_manager.go:224] "Eviction manager: monitoring loop exiting" err="context canceled"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717439     721 podcertificatemanager.go:351] "podcertificate.IssuingManager shut down"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717460     721 volume_manager.go:341] "Shutting down Kubelet Volume Manager"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717507     721 tlsconfig.go:258] "Shutting down DynamicServingCertificateController"
+Nov 05 15:49:34 node01 kubelet[721]: I1105 15:49:34.717519     721 server.go:302] "Shutting down pods API server"
+Nov 05 15:49:34 node01 systemd[1]: Stopping kubelet.service - kubelet: The Kubernetes Node Agent...
+Nov 05 15:49:34 node01 systemd[1]: kubelet.service: Deactivated successfully.
+Nov 05 15:49:34 node01 systemd[1]: Stopped kubelet.service - kubelet: The Kubernetes Node Agent.
+Nov 05 15:49:34 node01 systemd[1]: kubelet.service: Consumed 5.623s CPU time.
+root@node01:~$ sudo systemctl start kubelet
+root@node01:~$ systemctl status kubelet
+● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; preset: enabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: active (running) since Thu 2026-11-05 15:51:49 UTC; 4s ago
+       Docs: https://kubernetes.io/docs/
+   Main PID: 4279 (kubelet)
+      Tasks: 8 (limit: 2237)
+     Memory: 23.4M (peak: 23.7M)
+        CPU: 152ms
+     CGroup: /system.slice/kubelet.service
+             └─4279 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime-endpoint unix:///run>
+
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.326993    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"lib-modules\" (UniqueName: \"kubernetes.io/host-path/f>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327002    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"envoy-sockets\" (UniqueName: \"kubernetes.io/host-path>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327012    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"host-proc-sys-net\" (UniqueName: \"kubernetes.io/host->
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327033    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"envoy-artifacts\" (UniqueName: \"kubernetes.io/host-pa>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327045    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"cilium-netns\" (UniqueName: \"kubernetes.io/host-path/>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327062    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"hostproc\" (UniqueName: \"kubernetes.io/host-path/fc78>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327076    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"xtables-lock\" (UniqueName: \"kubernetes.io/host-path/>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327092    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"cni-path\" (UniqueName: \"kubernetes.io/host-path/fc78>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327101    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"etc-cni-netd\" (UniqueName: \"kubernetes.io/host-path/>
+Nov 05 15:51:50 node01 kubelet[4279]: I1105 15:51:50.327376    4279 reconciler_common.go:251] "operationExecutor.VerifyControllerAttachedVolume started for volume \"envoy-sockets\" (UniqueName: \"kubernetes.io/host-path>
+root@node01:~$ history
+    1  ip a
+    2  exit
+    3  systemctl status kubelet
+    4  systemctl status kubelet -n 20
+    5  sudo systemctl start kubelet
+    6  systemctl status kubelet
+    7  history
+root@node01:~$ exit
+logout
+Connection to node01 closed.
+root@controlplane:~$ kubectl get nodes
+NAME           STATUS   ROLES           AGE   VERSION
+controlplane   Ready    control-plane   31d   v1.37.1
+node01         Ready    <none>          31d   v1.37.1
+root@controlplane:~$ 
+
+
+
+
+
+#service was down restarted the service
+
+
+
+root@node01:~$ history
+    1  ip a
+    2  exit
+    3  systemctl status kubelet
+    4  systemctl status kubelet -n 20
+    5  sudo systemctl start kubelet
+    6  systemctl status kubelet
+    7  history
