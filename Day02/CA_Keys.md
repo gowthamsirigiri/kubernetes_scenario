@@ -1,6 +1,6 @@
 Kubernetes PKI & API Server Key: A Troubleshooting & Theory Guide
 
-This document summarizes our discussion on the role of the Kubernetes API server private key (apiserver.key), how it interacts with the cluster's Certificate Authority (CA), and what happens during catastrophic key loss and recovery.
+This document summarizes discussion on the role of the Kubernetes API server private key (apiserver.key), how it interacts with the cluster's Certificate Authority (CA), and what happens during catastrophic key loss and recovery.
 
 1. What is apiserver.key?
 
